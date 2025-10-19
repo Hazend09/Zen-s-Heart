@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>My Heart for you</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #0a0010, #000);
+    }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <!-- Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FontLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/geometries/TextGeometry.js"></script>
+
+  <script>
+    // ======== SCENE ========
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+    camera.position.z = 55;
+
+    // ======== HEART ========
+    function heart2D(t) {
+      const x = 16 * Math.pow(Math.sin(t), 3);
+      const y = (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * 1.05;
+      return { x, y };
+    }
+
+    const particleCount = 9000;
+    const basePositions = new Float32Array(particleCount * 3);
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const color = new THREE.Color();
+    let count = 0;
+
+    for (let i = 0; i < particleCount; i++) {
+      const t = Math.random() * Math.PI * 2;
+      const r = Math.pow(Math.random(), 0.35);
+      const { x, y } = heart2D(t);
+      if (Math.sqrt(x*x + y*y) < 3.6) continue;
+      const idx = count * 3;
+      const scale = 1.8;
+      basePositions[idx] = x * r * scale;
+      basePositions[idx + 1] = y * r * scale;
+      basePositions[idx + 2] = (Math.random() - 0.5) * 4;
+
+      positions[idx] = basePositions[idx];
+      positions[idx + 1] = basePositions[idx + 1];
+      positions[idx + 2] = basePositions[idx + 2];
+
+      const bright = 0.7 + 0.3 * Math.random();
+      color.setHSL(0.97, 1, bright * 0.5 + 0.3);
+      colors[idx] = color.r;
+      colors[idx + 1] = color.g;
+      colors[idx + 2] = color.b;
+      count++;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+      size: 0.22,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9
+    });
+
+    const heart = new THREE.Points(geometry, material);
+    scene.add(heart);
+
+    // ======== STARS ========
+    const starCount = 600;
+    const starPositions = new Float32Array(starCount * 3);
+    const starSpeeds = new Float32Array(starCount);
+
+    for (let i = 0; i < starCount; i++) {
+      let x, y, insideHeart = true;
+      while (insideHeart) {
+        x = (Math.random() - 0.5) * 300;
+        y = (Math.random() - 0.5) * 200;
+        const heartCheck = Math.pow(x / 25, 2) + Math.pow((y - 10) / 25, 2);
+        insideHeart = (heartCheck < 1.1 && Math.abs(x) < 40 && y > -50 && y < 60);
+      }
+      const z = -60 - Math.random() * 100;
+      const idx = i * 3;
+      starPositions[idx] = x;
+      starPositions[idx + 1] = y;
+      starPositions[idx + 2] = z;
+      starSpeeds[i] = Math.random() * 2.0 + 0.5;
+    }
+
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+    starGeometry.setAttribute("aSpeed", new THREE.BufferAttribute(starSpeeds, 1));
+
+    const starMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      uniforms: {
+        time: { value: 0.0 },
+        color: { value: new THREE.Color(0xffffff) },
+      },
+      vertexShader: `
+        attribute float aSpeed;
+        varying float vSpeed;
+        void main() {
+          vSpeed = aSpeed;
+          gl_PointSize = 1.6;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float time;
+        uniform vec3 color;
+        varying float vSpeed;
+        void main() {
+          float phase = mod(time * vSpeed + vSpeed * 15.0, 2.5);
+          float flicker = step(phase, 1.0);
+          gl_FragColor = vec4(color * flicker, flicker);
+        }
+      `,
+    });
+
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+
+    function animateStars(t) {
+      starMaterial.uniforms.time.value = t;
+    }
+
+    // ======== TEXT ========
+    const loader = new THREE.FontLoader();
+    loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
+      const baseMessages = [
+        "Thank you for inspiring us every day. Happy Women’s Day!",
+        "Wishing you a day as wonderful and amazing as you are.",
+        "Thank you for all that you do.",
+        "I love you",
+        "The best wish for you",
+        "Grace in every step, light in every glance",
+        "he he he",
+        "Too glam to give a damn.",
+        "Stay fabulous, always.",
+        "U R da bezt",
+        "You are the reason kindness still exists.",
+        "You make the world a better place.",
+        "Beautiful inside & out.",
+        "Brains, beauty, and a heart of gold — basically, you’re a superhero."
+      ];
+
+      const textMeshes = [];
+      const copiesPerMessage = 10;
+      const verticalSpacing = 10; // giãn cách đều để không đè
+
+      function createText(msg, index) {
+        const textGeo = new THREE.TextGeometry(msg, {
+          font: font,
+          size: 1.6,
+          height: 0.03,
+          curveSegments: 10,
+        });
+        textGeo.computeBoundingBox();
+        const width = textGeo.boundingBox.max.x - textGeo.boundingBox.min.x;
+        textGeo.translate(-width / 2, 0, 0);
+
+        const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
+        const mesh = new THREE.Mesh(textGeo, mat);
+
+        const x = (Math.random() - 0.5) * 60;
+        const y = -60 - (index * verticalSpacing);
+        const z = (Math.random() - 0.5) * 20;
+
+        mesh.position.set(x, y, z);
+        mesh.userData = { speed: 0.1 }; // tốc độ chậm hơn trước
+        scene.add(mesh);
+        textMeshes.push(mesh);
+      }
+
+      let total = 0;
+      for (let i = 0; i < copiesPerMessage; i++) {
+        baseMessages.forEach(msg => {
+          createText(msg, total);
+          total++;
+        });
+      }
+
+      function animateText() {
+        textMeshes.forEach((mesh, index) => {
+          mesh.position.y += mesh.userData.speed;
+          if (mesh.position.y > 40) mesh.material.opacity = Math.max(0, mesh.material.opacity - 0.015);
+          if (mesh.position.y > 55) {
+            mesh.position.y = -60 - (index * verticalSpacing);
+            mesh.position.x = (Math.random() - 0.5) * 60;
+            mesh.position.z = (Math.random() - 0.5) * 20;
+            mesh.material.opacity = 1;
+          }
+        });
+      }
+
+      // ======== ANIMATE ========
+      const clock = new THREE.Clock();
+      function animate() {
+        requestAnimationFrame(animate);
+        const t = clock.getElapsedTime();
+        const pulse = 1 + 0.05 * Math.sin(t * 3.5);
+
+        const pos = geometry.attributes.position.array;
+        for (let i = 0; i < count; i++) {
+          const idx = i * 3;
+          const bx = basePositions[idx];
+          const by = basePositions[idx + 1];
+          const bz = basePositions[idx + 2];
+          const noise = Math.sin(t * 3 + i / 200) * 0.25;
+          pos[idx] = bx * pulse + noise;
+          pos[idx + 1] = by * pulse + noise;
+          pos[idx + 2] = bz + Math.cos(t * 2 + i / 300) * 0.25;
+        }
+        geometry.attributes.position.needsUpdate = true;
+
+        heart.rotation.y = Math.sin(t * 0.25) * 0.06;
+        heart.rotation.x = Math.cos(t * 0.35) * 0.04;
+
+        animateStars(t);
+        animateText();
+        renderer.render(scene, camera);
+      }
+      animate();
+    });
+
+    // ======== RESIZE ========
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+
+  <!-- ======== BACKGROUND MUSIC ======== -->
+  <audio id="bg-music" src="3432230036620619968.mp3" loop></audio>
+
+  <button id="music-btn"
+    style="position: fixed; top: 20px; right: 20px; z-index: 999;
+    background: rgba(255,255,255,0.15); color: #fff; border: 1px solid #fff2;
+    border-radius: 8px; padding: 10px 16px; font-size: 14px; cursor: pointer;
+    backdrop-filter: blur(4px); transition: 0.2s;">
+    🔊 Play Music
+  </button>
+
+  <script>
+    const music = document.getElementById("bg-music");
+    const btn = document.getElementById("music-btn");
+
+    btn.addEventListener("click", () => {
+      if (music.paused) {
+        music.play();
+        btn.textContent = "🔈 Pause Music";
+        btn.style.background = "rgba(255,255,255,0.25)";
+      } else {
+        music.pause();
+        btn.textContent = "🔊 Play Music";
+        btn.style.background = "rgba(255,255,255,0.15)";
+      }
+    });
+  </script>
+</body>
+</html>
